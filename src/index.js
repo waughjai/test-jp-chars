@@ -2,110 +2,11 @@ import './index.scss';
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { randListEntry, shuffleList } from './rand.js';
-
-const hiragana = {
-    main: {
-        "∅": {
-            a: 'あ',
-            i: 'い',
-            u: 'う',
-            e: 'え',
-            o: 'お',
-        },
-        k: {
-            a: 'か',
-            i: 'き',
-            u: 'く',
-            e: 'け',
-            o: 'こ',
-        },
-        s: {
-            a: 'さ',
-            i: 'し',
-            u: 'す',
-            e: 'せ',
-            o: 'そ',
-        },
-        t: {
-            a: 'た',
-            i: 'ち',
-            u: 'つ',
-            e: 'て',
-            o: 'と',
-        },
-        n: {
-            a: 'な',
-            i: 'に',
-            u: 'ぬ',
-            e: 'ね',
-            o: 'の',
-            "∅": 'ん',
-        },
-        h: {
-            a: 'は',
-            i: 'ひ',
-            u: 'ふ',
-            e: 'へ',
-            o: 'ほ',
-        },
-        m: {
-            a: 'ま',
-            i: 'み',
-            u: 'む',
-            e: 'め',
-            o: 'も',
-        },
-        y: {
-            a: 'や',
-            u: 'ゆ',
-            o: 'よ',
-        },
-        r: {
-            a: 'ら',
-            i: 'り',
-            u: 'る',
-            e: 'れ',
-            o: 'ろ',
-        },
-        w: {
-            a: 'わ',
-            o: 'を',
-        },
-    }
-};
-
-const getRomaji = ( consonant, vowel ) => {
-    if ( consonant === "∅" ) {
-        return vowel;
-    } else {
-        const combined = `${ consonant }${ vowel }`;
-        switch ( combined ) {
-            case ( `si` ):
-                return `shi`;
-            case ( `ti` ):
-                return `chi`;
-            case ( `tu` ):
-                return `tsu`;
-            case ( `hu` ):
-                return `fu`;
-            case ( `n∅`):
-                return `n`;
-            default:
-                return combined;
-        }
-    }
-}
-
-const generateHiraganaList = selectorType => {
-    const list = [];
-    for ( const [ consonant, group ] of Object.entries( hiragana.main ) ) {
-        for ( const [ vowel, item ] of Object.entries( group ) ) {
-            list.push( { hiragana: item, romaji: getRomaji( consonant, vowel ) } );
-        }
-    }
-    return selectorType === `romaji` ? list : shuffleList( list );
-};
+import {
+    generateOptionsList,
+    generateCharList,
+} from './chars.js';
+import { randListEntry } from './rand.js';
 
 const getGradeLetter = percentage => {
     if ( percentage >= 0.9 ) {
@@ -141,19 +42,28 @@ const FinalScore = ( { correct, total } ) => <div>
     <div>Grade: { getGrade( correct, total ) }</div>
 </div>;
 
-const numberOfTries = 3;
+const numberOfTries = 40;
+
+const jpCharOptions = [
+    `Hiragana`,
+    `Katakana`,
+    `Kanji`,
+];
 
 const Game = props => {
-    const { targetType, selectorType, hiraganaList, reset } = props;
+    const { difficulty, targetType, selectorType, charList, reset } = props;
 
     const [ correct, setCorrect ] = useState( 0 );
     const [ total, setTotal ] = useState( 0 );
-    const [ entry, setEntry ] = useState( randListEntry( hiraganaList ) );
+    const [ entry, setEntry ] = useState( randListEntry( charList ) );
     const [ guess, setGuess ] = useState( null );
+    const [ optionsList, setOptionsList ] = useState( generateOptionsList( selectorType, entry, difficulty ) );
     const inputRef = useRef( null );
 
     const next = () => {
-        setEntry( randListEntry( hiraganaList ) );
+        const newEntry = randListEntry( charList );
+        setEntry( newEntry );
+        setOptionsList( generateOptionsList( selectorType, newEntry, difficulty ) );
         setGuess( null );
         if ( inputRef?.current ) {
             inputRef.current.value = ``;
@@ -169,7 +79,6 @@ const Game = props => {
     };
 
     return <div>
-        <h2>Testing Hiragana</h2>
         { total < numberOfTries && <div>
             <div>Score: { correct } / { total }</div>
             <div className="target">{ entry[ targetType ] }</div>
@@ -179,14 +88,14 @@ const Game = props => {
                 <div>Correct answer: { entry[ selectorType ] }</div>
             </div> }
             <div>
-                { hiraganaList.map( item => {
+                { optionsList.map( item => {
                     const className = guess === null
                         ? `btn btn-outline-primary rounded-pill`
                         : (
-                            entry[ selectorType ] === item[ selectorType ]
+                            entry[ selectorType ] === item
                                 ? `btn btn-success rounded-pill`
                                 : (
-                                    guess === item[ selectorType ]
+                                    guess === item
                                         ? `btn btn-danger rounded-pill`
                                         : `btn btn-outline-primary rounded-pill`
                                 )
@@ -194,13 +103,13 @@ const Game = props => {
                     return <button
                         className={ className }
                         disabled={ guess !== null }
-                        onClick={ () => tryGuess( item[ selectorType ] ) }
+                        onClick={ () => tryGuess( item ) }
                     >
-                        { item[ selectorType ] }
+                        { item }
                     </button>;
                 } ) }
             </div>
-            { selectorType === `romaji` && <div>
+            { selectorType === `en` && <div>
                 <input
                     ref={ inputRef }
                     disabled={ guess !== null }
@@ -217,45 +126,98 @@ const Game = props => {
         { total >= numberOfTries && <FinalScore correct={ correct } total={ total } /> }
         <div><button className="btn btn-danger" onClick={ reset }>Reset</button></div>
     </div>;
-}
+};
 
 const Canvas = () => {
-    const [ targetType, setTargetType ] = useState( null );
-    const [ selectorType, setSelectorType ] = useState( `hiragana` );
-    const [ hiraganaList, setHiraganaList ] = useState( [] );
+    const [ difficulty, setDifficulty ] = useState( 1 );
+    const [ selectorType, setSelectorType ] = useState( `en` );
+    const [ targetType, setTargetType ] = useState( `jp` );
+    const [ charList, setCharList ] = useState( [] );
+    const [ charOptionsSelected, setCharOptionsSelected ] = useState( [ true, false, false ] );
 
-    const targetHiragana = () => {
-        setTargetType( `hiragana` );
-        setSelectorType( `romaji` );
-        setHiraganaList( generateHiraganaList( `romaji` ) );
+    const createCheckboxUpdater = index => e => {
+        const newCharOptionsSelected = charOptionsSelected.map( ( v, i ) => i === index ? !v : v );
+        setCharOptionsSelected( newCharOptionsSelected );
     };
 
-    const targetRomaji = () => {
-        setTargetType( `romaji` );
-        setSelectorType( `hiragana` );
-        setHiraganaList( generateHiraganaList( `hiragana` ) );
+    const play = () => {
+        const includedCharTypes = charOptionsSelected.map( ( v, i ) => v ? jpCharOptions[ i ].toLowerCase() : null ).filter( v => v !== null );
+        if ( includedCharTypes.length === 0 ) {
+            window.alert( `Please select at least one character type.` );
+            return;
+        }
+        setCharList( generateCharList( includedCharTypes, difficulty ) );
     };
 
     const reset = () => {
         if ( window.confirm( `Are you sure you want to reset the game?` ) ) {
-            setTargetType( null );
-            setSelectorType( `hiragana` );
-            setHiraganaList( [] );
+            setCharList( [] );
         }
     };
 
     return <div>
-        { targetType === null && <div>
-            <h2>Testing Hiragana</h2>
-            <h3>Choose a target type:</h3>
-            <button className="btn btn-primary" onClick={ targetHiragana }>Hiragana</button>
-            <button className="btn btn-primary" onClick={ targetRomaji }>Romaji</button>
+        { charList.length === 0 && <div>
+            <div>
+                <h3>Game type:</h3>
+                <radiogroup>
+                    <div>
+                        <label className="form-radio">
+                            <input
+                                type="radio"
+                                checked={ targetType === `jp` }
+                                onClick={ () => {
+                                    setTargetType( `jp` );
+                                    setSelectorType( `en` );
+                                } } />
+                            JP to EN
+                        </label>
+                    </div>
+                    <div>
+                        <label className="form-radio">
+                            <input
+                                type="radio"
+                                checked={ targetType === `en` }
+                                onClick={ () => {
+                                    setTargetType( `en` );
+                                    setSelectorType( `jp` );
+                                } } />
+                            EN to JP
+                        </label>
+                    </div>
+                </radiogroup>
+            </div>
+            <div>
+                <h3>JP Chars</h3>
+                <div>
+                    { jpCharOptions.map( ( name, index ) => <label className="form-checkbox">
+                        <input type="checkbox" name="selectorType" checked={ charOptionsSelected[ index ] } onClick={ createCheckboxUpdater( index ) } />
+                        { name }
+                    </label> ) }
+                </div>
+            </div>
+            <div>
+                <h3>Difficulty:</h3>
+                <radiogroup>
+                    { [ ...Array(5).keys() ].map( i => <div>
+                        <label className="form-radio">
+                            <input
+                                type="radio"
+                                checked={ difficulty === i + 1 }
+                                onClick={ () => setDifficulty( i + 1 ) }
+                            />
+                            { i + 1 }
+                        </label>
+                    </div> ) }
+                </radiogroup>
+            </div>
+            <button className="btn btn-primary" onClick={ play }>Play</button>
         </div> }
-        { targetType !== null && <Game
+        { charList.length > 0 && <Game
+            difficulty={ difficulty }
             reset={ reset }
             targetType={ targetType }
             selectorType={ selectorType }
-            hiraganaList={ hiraganaList }
+            charList={ charList }
         /> }
     </div>;
 };
